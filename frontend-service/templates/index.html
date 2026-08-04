@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    >
+    <title>Two-Service Application</title>
+  </head>
+
+  <body>
+    <main>
+      <h1>Two-Service Application</h1>
+
+      <p>
+        Frontend servisi, backend servisinden bir mesaj alır.
+      </p>
+
+      <form action="/message" method="get">
+        <button type="submit">
+          Backend mesajını getir
+        </button>
+      </form>
+
+      {% if message %}
+        <p id="message">{{ message }}</p>
+      {% endif %}
+
+      {% if error %}
+        <p id="error">{{ error }}</p>
+      {% endif %}
+    </main>
+  </body>
+</html>

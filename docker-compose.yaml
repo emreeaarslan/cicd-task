@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ./backend-service
+    image: cicd-backend:local
+    ports:
+      - "5001:5001"
+
+  frontend:
+    build:
+      context: ./frontend-service
+    image: cicd-frontend:local
+    ports:
+      - "5002:5002"
+    environment:
+      BACKEND_URL: http://backend:5001
+    depends_on:
+      - backend
