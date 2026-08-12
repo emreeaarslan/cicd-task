@@ -20,7 +20,7 @@ def get_message():
     return jsonify(
         {
             "service": "backend",
-            "message": "Backend service is working.",
+            "message": "Backend service is running - v1.0.2",
         }
     ), 200
 

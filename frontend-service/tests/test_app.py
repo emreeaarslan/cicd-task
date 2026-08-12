@@ -18,7 +18,7 @@ def test_frontend_displays_backend_message(client):
     fake_response.raise_for_status.return_value = None
     fake_response.json.return_value = {
         "service": "backend",
-        "message": "Backend service is working.",
+        "message": "Backend service is running - v1.0.2",
     }
 
     with patch.object(
@@ -29,4 +29,4 @@ def test_frontend_displays_backend_message(client):
         response = client.get("/message")
 
     assert response.status_code == 200
-    assert b"Backend service is working." in response.data
+    assert b"Backend service is running - v1.0.2" in response.data
