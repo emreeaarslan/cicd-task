@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/emreeaarslan/cicd-backend:v1.0.1
+          image: ghcr.io/emreeaarslan/cicd-backend:v1.0.2
           ports:
             - containerPort: 5001
 ---
