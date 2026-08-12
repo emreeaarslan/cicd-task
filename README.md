@@ -4,13 +4,151 @@
 
 ## Proje Yapısı
 
-* `backend-service/` — Flask API servisi
-* `frontend-service/` — Backend ile HTTP üzerinden haberleşen Flask frontend
-* `k8s/` — Backend ve frontend Kubernetes manifestleri
-* `argocd/` — Argo CD Application tanımı
-* `.github/workflows/ci.yml` — GitHub Actions pipeline
-* `docker-compose.yaml` — Servislerin local ortamda birlikte çalıştırılması
-* `docs/references.md` — Kullanılan kaynaklar
+- `backend-service/` — Flask API servisi
+- `frontend-service/` — Backend ile HTTP üzerinden haberleşen Flask frontend
+- `k8s/` — Backend ve frontend Kubernetes manifestleri
+- `argocd/` — Argo CD Application tanımı
+- `.github/workflows/ci.yml` — GitHub Actions pipeline
+- `docker-compose.yaml` — Servislerin local ortamda birlikte çalıştırılması
+- `docs/references.md` — Kullanılan kaynaklar
+
+## Getting Started
+
+### Gereksinimler
+
+Projeyi local ortamda çalıştırmak için:
+
+- Git
+- Docker Desktop
+- Python 3
+- kubectl
+- Minikube
+
+gereklidir.
+
+### Repository'yi Klonlama
+
+```bash
+git clone https://github.com/emreeaarslan/cicd-task.git
+cd cicd-task
+```
+
+### Local Testler
+
+Python virtual environment oluşturulur:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Backend testleri:
+
+```bash
+cd backend-service
+pip install -r requirements-dev.txt
+pytest -v
+cd ..
+```
+
+Frontend testleri:
+
+```bash
+cd frontend-service
+pip install -r requirements-dev.txt
+pytest -v
+cd ..
+```
+
+### Docker Compose ile Çalıştırma
+
+İki servisi local ortamda birlikte çalıştırmak için:
+
+```bash
+docker compose up --build -d
+```
+
+Container durumları:
+
+```bash
+docker compose ps
+```
+
+### Kubernetes Cluster'ı Başlatma
+
+Docker Desktop açıkken Minikube başlatılır:
+
+```bash
+minikube start --driver=docker
+```
+
+Node durumu kontrol edilir:
+
+```bash
+kubectl get nodes
+```
+
+### Argo CD Kurulumu
+
+Argo CD namespace'i oluşturulur:
+
+```bash
+kubectl create namespace argocd
+```
+
+Argo CD cluster'a kurulur:
+
+```bash
+kubectl apply -n argocd --server-side --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Argo CD Pod'larının durumu kontrol edilir:
+
+```bash
+kubectl get pods -n argocd
+```
+
+### Argo CD Application
+
+Repository içerisinde bulunan Argo CD Application manifesti uygulanır:
+
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+Application, `main` branch'indeki `k8s/` dizinini takip eder. Kubernetes manifestleri ayrıca manuel olarak apply edilmez; deployment Argo CD tarafından gerçekleştirilir.
+
+Application durumu:
+
+```bash
+kubectl get applications -n argocd
+```
+
+Beklenen durum:
+
+```text
+Synced
+Healthy
+```
+
+Kubernetes resource'larını kontrol etmek için:
+
+```bash
+kubectl get pods
+kubectl get deployments
+kubectl get services
+```
+
+### Frontend'e Erişim
+
+Frontend'i local tarayıcıdan açmak için:
+
+```bash
+minikube service frontend --url
+```
+
+Komutun verdiği URL tarayıcıda açılarak frontend ve backend arasındaki iletişim kontrol edilebilir.
 
 ## Uygulama
 
@@ -18,8 +156,8 @@ Backend `5001`, frontend `5002` portunda çalışır.
 
 Backend endpointleri:
 
-* `GET /health`
-* `GET /api/message`
+- `GET /health`
+- `GET /api/message`
 
 Frontend, backend adresini `BACKEND_URL` environment variable üzerinden alır.
 
@@ -31,8 +169,8 @@ Testler `pytest` ile çalıştırılıyor.
 
 Backend tarafında:
 
-* `/health` endpoint'inin başarılı cevap verdiği
-* `/api/message` endpoint'inin frontend'in beklediği response yapısını koruduğu
+- `/health` endpoint'inin başarılı cevap verdiği
+- `/api/message` endpoint'inin frontend'in beklediği response yapısını koruduğu
 
 kontrol ediliyor.
 
@@ -62,13 +200,13 @@ Release işlemi manuel olarak oluşturulan `v1.0.0`, `v1.0.1`, `v1.0.2` gibi Git
 
 Backend ve frontend ayrı Docker image'ları olarak paketleniyor.
 
-* `ghcr.io/emreeaarslan/cicd-backend`
-* `ghcr.io/emreeaarslan/cicd-frontend`
+- `ghcr.io/emreeaarslan/cicd-backend`
+- `ghcr.io/emreeaarslan/cicd-frontend`
 
 Güncel release örneği:
 
-* `ghcr.io/emreeaarslan/cicd-backend:v1.0.2`
-* `ghcr.io/emreeaarslan/cicd-frontend:v1.0.2`
+- `ghcr.io/emreeaarslan/cicd-backend:v1.0.2`
+- `ghcr.io/emreeaarslan/cicd-frontend:v1.0.2`
 
 İlk release image'ları yalnızca `linux/amd64` platformunda oluşturulmuştu.
 
@@ -76,8 +214,8 @@ Minikube node'unun `arm64` olduğu görüldükten sonra pipeline'a QEMU ve Docke
 
 Image'lar artık:
 
-* `linux/amd64`
-* `linux/arm64`
+- `linux/amd64`
+- `linux/arm64`
 
 platformları için oluşturuluyor.
 
@@ -87,10 +225,10 @@ Local Kubernetes ortamı olarak Minikube kullanılıyor.
 
 Uygulama için dört temel resource bulunuyor:
 
-* Backend Deployment
-* Backend ClusterIP Service
-* Frontend Deployment
-* Frontend NodePort Service
+- Backend Deployment
+- Backend ClusterIP Service
+- Frontend Deployment
+- Frontend NodePort Service
 
 Backend yalnızca cluster içinden erişilebilir durumda.
 
@@ -104,10 +242,10 @@ Argo CD Minikube cluster'ında `argocd` namespace'i içerisinde çalışıyor.
 
 `argocd/application.yaml`, Argo CD'ye şu kaynağı takip etmesini söylüyor:
 
-* Repository: `cicd-task`
-* Branch: `main`
-* Path: `k8s/`
-* Destination namespace: `default`
+- Repository: `cicd-task`
+- Branch: `main`
+- Path: `k8s/`
+- Destination namespace: `default`
 
 Automated sync açık. Ayrıca `prune` ve `selfHeal` aktif.
 
@@ -150,16 +288,16 @@ Bu kontrolle Git'teki desired state ile Kubernetes cluster'ın Argo CD tarafınd
 
 **GitHub Actions**
 
-* Testleri çalıştırır.
-* Docker image'larını oluşturur.
-* Image'ları GHCR'ye gönderir.
-* GitHub Release oluşturur.
-* Release edilen image version'ını Kubernetes manifestlerine yazar.
+- Testleri çalıştırır.
+- Docker image'larını oluşturur.
+- Image'ları GHCR'ye gönderir.
+- GitHub Release oluşturur.
+- Release edilen image version'ını Kubernetes manifestlerine yazar.
 
 **Argo CD**
 
-* `main/k8s` içerisindeki desired state'i takip eder.
-* Git değişikliklerini Kubernetes'e uygular.
-* Cluster'ı Git repository ile senkronize tutar.
+- `main/k8s` içerisindeki desired state'i takip eder.
+- Git değişikliklerini Kubernetes'e uygular.
+- Cluster'ı Git repository ile senkronize tutar.
 
 Bu yapıda CI ve release hazırlığı GitHub Actions tarafında, Kubernetes deployment ise Argo CD tarafında yönetiliyor.
