@@ -32,5 +32,5 @@ def test_message_endpoint_preserves_frontend_contract(client):
     assert response.is_json
     assert response.get_json() == {
         "service": "backend",
-        "message": "Backend service is working.",
+        "message": "Backend service is running - v1.0.2",
     }
