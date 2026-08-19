@@ -1,14 +1,14 @@
 import pytest
 
-from app import app
+import app as app_module
 
 
 @pytest.fixture()
 def client():
     """Create a test client for the backend application."""
-    app.config.update(TESTING=True)
+    app_module.app.config.update(TESTING=True)
 
-    with app.test_client() as test_client:
+    with app_module.app.test_client() as test_client:
         yield test_client
 
 
@@ -24,8 +24,15 @@ def test_health_endpoint_returns_service_status(client):
     }
 
 
-def test_message_endpoint_preserves_frontend_contract(client):
+def test_message_endpoint_preserves_frontend_contract(client, monkeypatch):
     """The message endpoint must return the fields expected by the frontend."""
+    monkeypatch.setattr(app_module, "init_db", lambda: None)
+    monkeypatch.setattr(
+        app_module,
+        "get_latest_message",
+        lambda: "Backend service is running - v1.0.2",
+    )
+
     response = client.get("/api/message")
 
     assert response.status_code == 200
@@ -34,3 +41,29 @@ def test_message_endpoint_preserves_frontend_contract(client):
         "service": "backend",
         "message": "Backend service is running - v1.0.2",
     }
+
+
+def test_message_endpoint_stores_new_message(client, monkeypatch):
+    """The POST endpoint must pass the new message to the persistence layer."""
+    saved_messages = []
+
+    monkeypatch.setattr(app_module, "init_db", lambda: None)
+    monkeypatch.setattr(
+        app_module,
+        "save_message",
+        lambda message: saved_messages.append(message),
+    )
+
+    response = client.post(
+        "/api/message",
+        json={"message": "PostgreSQL persistence test"},
+    )
+
+    assert response.status_code == 201
+    assert response.is_json
+    assert response.get_json() == {
+        "service": "backend",
+        "message": "PostgreSQL persistence test",
+    }
+
+    assert saved_messages == ["PostgreSQL persistence test"]

@@ -1,6 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+
+from db import get_latest_message, init_db, save_message
 
 app = Flask(__name__)
+
+DEFAULT_MESSAGE = "Backend service is running - v1.0.2"
 
 
 @app.get("/health")
@@ -16,13 +20,48 @@ def health():
 
 @app.get("/api/message")
 def get_message():
-    """Return a sample message for the frontend service."""
+    """Return the latest message stored in PostgreSQL."""
+    init_db()
+
+    message = get_latest_message()
+
+    if message is None:
+        save_message(DEFAULT_MESSAGE)
+        message = DEFAULT_MESSAGE
+
     return jsonify(
         {
             "service": "backend",
-            "message": "Backend service is running - v1.0.2",
+            "message": message,
         }
     ), 200
+
+
+@app.post("/api/message")
+def create_message():
+    """Store a new message in PostgreSQL."""
+    data = request.get_json(silent=True) or {}
+    message = data.get("message")
+
+    if not isinstance(message, str) or not message.strip():
+        return jsonify(
+            {
+                "service": "backend",
+                "error": "message is required",
+            }
+        ), 400
+
+    message = message.strip()
+
+    init_db()
+    save_message(message)
+
+    return jsonify(
+        {
+            "service": "backend",
+            "message": message,
+        }
+    ), 201
 
 
 if __name__ == "__main__":
