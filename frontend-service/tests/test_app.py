@@ -30,3 +30,14 @@ def test_frontend_displays_backend_message(client):
 
     assert response.status_code == 200
     assert b"Backend service is running - v1.0.2" in response.data
+
+def test_frontend_health_endpoint(client):
+    """The frontend health endpoint must report an available service."""
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.is_json
+    assert response.get_json() == {
+        "service": "frontend",
+        "status": "ok",
+    }

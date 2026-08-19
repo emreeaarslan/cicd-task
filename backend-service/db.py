@@ -12,6 +12,12 @@ def get_connection():
 
     return psycopg.connect(database_url)
 
+def check_database():
+    """Check whether PostgreSQL is reachable."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            return cur.fetchone() == (1,)
 
 def init_db():
     """Create the messages table if it does not already exist."""

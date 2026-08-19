@@ -1,6 +1,7 @@
+import psycopg
 from flask import Flask, jsonify, request
 
-from db import get_latest_message, init_db, save_message
+from db import check_database, get_latest_message, init_db, save_message
 
 app = Flask(__name__)
 
@@ -16,6 +17,29 @@ def health():
             "status": "ok",
         }
     ), 200
+
+
+@app.get("/health/ready")
+def readiness():
+    """Return whether the backend can reach PostgreSQL."""
+    try:
+        if check_database():
+            return jsonify(
+                {
+                    "service": "backend",
+                    "status": "ready",
+                }
+            ), 200
+
+    except (psycopg.Error, RuntimeError):
+        pass
+
+    return jsonify(
+        {
+            "service": "backend",
+            "status": "not ready",
+        }
+    ), 503
 
 
 @app.get("/api/message")
