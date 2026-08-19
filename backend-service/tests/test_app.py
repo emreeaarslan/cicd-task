@@ -67,3 +67,41 @@ def test_message_endpoint_stores_new_message(client, monkeypatch):
     }
 
     assert saved_messages == ["PostgreSQL persistence test"]
+
+
+def test_readiness_returns_ready_when_database_is_available(client, monkeypatch):
+    """The backend must be ready when PostgreSQL is reachable."""
+    monkeypatch.setattr(app_module, "check_database", lambda: True)
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.is_json
+    assert response.get_json() == {
+        "service": "backend",
+        "status": "ready",
+    }
+
+
+def test_readiness_returns_not_ready_when_database_is_unavailable(
+    client,
+    monkeypatch,
+):
+    """The backend must not be ready when PostgreSQL is unavailable."""
+    def unavailable_database():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        app_module,
+        "check_database",
+        unavailable_database,
+    )
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.is_json
+    assert response.get_json() == {
+        "service": "backend",
+        "status": "not ready",
+    }
