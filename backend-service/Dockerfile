@@ -6,7 +6,7 @@ COPY requirements.txt .
 
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-COPY app.py db.py ./
+COPY app.py db.py logging_config.py metrics_config.py telemetry_config.py ./
 
 EXPOSE 5001
 
