@@ -1,288 +1,303 @@
 # Two-Service CI/CD Pipeline with Argo CD
 
-Bu proje, iki basit Flask servisinden oluşan bir uygulama üzerinde CI/CD pipeline tasarımı ve GitOps tabanlı deployment sürecini göstermek amacıyla hazırlanmıştır.
+İki Flask servisinden oluşan basit bir uygulama için branch bazlı CI/CD pipeline ve Argo CD ile GitOps deployment akışı.
 
-Temel kapsam: iki servisli uygulama, pytest testleri, Docker paketleme, branch bazlı GitHub Actions pipeline'ı, GHCR image publishing, version tag ile release, multi-platform image üretimi, Kubernetes deployment ve Argo CD ile otomatik senkronizasyon.
+## Proje Yapısı
 
-## Architecture
+- `backend-service/` — Flask API servisi
+- `frontend-service/` — Backend ile HTTP üzerinden haberleşen Flask frontend
+- `k8s/` — Backend ve frontend Kubernetes manifestleri
+- `argocd/` — Argo CD Application tanımı
+- `.github/workflows/ci.yml` — GitHub Actions pipeline
+- `docker-compose.yaml` — Servislerin local ortamda birlikte çalıştırılması
+- `docs/references.md` — Kullanılan kaynaklar
 
-```mermaid
-flowchart TD
-    U[User / Browser] --> F[Frontend Service]
-    F -->|HTTP / backend:5001| B[Backend Service]
+## Getting Started
+
+### Gereksinimler
+
+Projeyi local ortamda çalıştırmak için:
+
+- Git
+- Docker Desktop
+- Python 3
+- kubectl
+- Minikube
+
+gereklidir.
+
+### Repository'yi Klonlama
+
+```bash
+git clone https://github.com/emreeaarslan/cicd-task.git
+cd cicd-task
 ```
 
-Kubernetes ortamında:
+### Local Testler
 
-```mermaid
-flowchart TD
-    U[Browser] --> FS[Frontend NodePort Service]
-    FS --> FP[Frontend Pod]
-    FP -->|http://backend:5001| BS[Backend ClusterIP Service]
-    BS --> BP[Backend Pod]
+Python virtual environment oluşturulur:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-## Project Structure
+Backend testleri:
+
+```bash
+cd backend-service
+pip install -r requirements-dev.txt
+pytest -v
+cd ..
+```
+
+Frontend testleri:
+
+```bash
+cd frontend-service
+pip install -r requirements-dev.txt
+pytest -v
+cd ..
+```
+
+### Docker Compose ile Çalıştırma
+
+İki servisi local ortamda birlikte çalıştırmak için:
+
+```bash
+docker compose up --build -d
+```
+
+Container durumları:
+
+```bash
+docker compose ps
+```
+
+### Kubernetes Cluster'ı Başlatma
+
+Docker Desktop açıkken Minikube başlatılır:
+
+```bash
+minikube start --driver=docker
+```
+
+Node durumu kontrol edilir:
+
+```bash
+kubectl get nodes
+```
+
+### Argo CD Kurulumu
+
+Argo CD namespace'i oluşturulur:
+
+```bash
+kubectl create namespace argocd
+```
+
+Argo CD cluster'a kurulur:
+
+```bash
+kubectl apply -n argocd --server-side --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Argo CD Pod'larının durumu kontrol edilir:
+
+```bash
+kubectl get pods -n argocd
+```
+
+### Argo CD Application
+
+Repository içerisinde bulunan Argo CD Application manifesti uygulanır:
+
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+Application, `main` branch'indeki `k8s/` dizinini takip eder. Kubernetes manifestleri ayrıca manuel olarak apply edilmez; deployment Argo CD tarafından gerçekleştirilir.
+
+Application durumu:
+
+```bash
+kubectl get applications -n argocd
+```
+
+Beklenen durum:
 
 ```text
-.
-├── backend-service/
-│   ├── app.py
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
-│   └── tests/
-├── frontend-service/
-│   ├── app.py
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
-│   ├── templates/
-│   └── tests/
-├── k8s/
-│   ├── backend.yaml
-│   └── frontend.yaml
-├── argocd/
-│   └── application.yaml
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── docker-compose.yaml
-└── docs/
-    └── references.md
+Synced
+Healthy
 ```
 
-## Services
+Kubernetes resource'larını kontrol etmek için:
 
-### Backend
+```bash
+kubectl get pods
+kubectl get deployments
+kubectl get services
+```
 
-Flask API servisi `5001` portunda çalışır.
+### Frontend'e Erişim
 
-Endpointler:
+Frontend'i local tarayıcıdan açmak için:
+
+```bash
+minikube service frontend --url
+```
+
+Komutun verdiği URL tarayıcıda açılarak frontend ve backend arasındaki iletişim kontrol edilebilir.
+
+## Uygulama
+
+Backend `5001`, frontend `5002` portunda çalışır.
+
+Backend endpointleri:
 
 - `GET /health`
 - `GET /api/message`
 
-### Frontend
+Frontend, backend adresini `BACKEND_URL` environment variable üzerinden alır.
 
-Flask tabanlı frontend servisi `5002` portunda çalışır.
+Docker Compose ve Kubernetes ortamında backend'e `http://backend:5001` adresi üzerinden erişilir.
 
-Backend adresi `BACKEND_URL` environment variable üzerinden alınır. Docker Compose ve Kubernetes ortamlarında frontend backend'e servis adı üzerinden ulaşır:
+## Testler
 
-```text
-http://backend:5001
-```
+Testler `pytest` ile çalıştırılıyor.
 
-## Tests
+Backend tarafında:
 
-Test framework olarak `pytest` kullanılmaktadır.
+- `/health` endpoint'inin başarılı cevap verdiği
+- `/api/message` endpoint'inin frontend'in beklediği response yapısını koruduğu
 
-Backend tarafında `/health` endpoint'inin doğru HTTP ve JSON cevabı verdiği, ayrıca `/api/message` endpoint'inin frontend'in beklediği API sözleşmesini koruduğu test edilmektedir.
+kontrol ediliyor.
 
-Frontend tarafında backend çağrısı mocklanarak backend'den gelen mesajın HTML içerisinde kullanıcıya gösterildiği doğrulanmaktadır.
+Frontend tarafında backend isteği mocklanarak gelen mesajın HTML içerisinde gösterildiği doğrulanıyor.
 
-GitHub Actions'ta backend ve frontend testleri paralel çalışır:
+GitHub Actions üzerinde backend ve frontend testleri ayrı job'larda paralel çalışıyor. Docker build ve release job'ları testlerin başarılı olmasına bağlı.
 
-```mermaid
-flowchart LR
-    B[Backend Tests] --> D[Docker Build / Release]
-    F[Frontend Tests] --> D
-```
+## Branch Akışı
 
-Docker build ve release aşamaları iki test job'ının da başarılı olmasına bağlıdır.
+| Trigger      | Test | Docker Build   | GHCR Push          | Release |
+| ------------ | ---- | -------------- | ------------------ | ------- |
+| `feature/*`  | Evet | Build kontrolü | Hayır              | Hayır   |
+| Pull Request | Evet | Build kontrolü | Hayır              | Hayır   |
+| `dev`        | Evet | Evet           | `dev-<commit-sha>` | Hayır   |
+| `main`       | Evet | Build kontrolü | Hayır              | Hayır   |
+| `v*.*.*` tag | Evet | Evet           | Version tag        | Evet    |
 
-## Branch Strategy
+Feature branch'lerinde değişikliklerin test ve build kontrolleri yapılıyor.
 
-| Trigger | Tests | Docker Build | GHCR Push | Release |
-|---|---|---|---|---|
-| `feature/*` | Yes | Validation | No | No |
-| Pull Request | Yes | Validation | No | No |
-| `dev` | Yes | Yes | `dev-<sha>` | No |
-| `main` | Yes | Validation | No | No |
-| `v*.*.*` tag | Yes | Yes | Version tag | GitHub Release |
+`dev` branch'ine giren kod için multi-platform Docker image'ları oluşturulup GHCR'ye `dev-<commit-sha>` etiketiyle gönderiliyor.
 
-Feature branch'leri geliştirme ve doğrulama için kullanılır. `dev` branch'ine merge edilen kod, commit SHA ile etiketlenmiş development image'ları olarak GHCR'ye gönderilir.
+`main` release edilebilir kodu tutuyor. Normal bir main push'u release oluşturmuyor.
 
-`main` branch'i release edilebilir kodu temsil eder. Resmi release normal `main` push'u ile değil, `v1.0.0`, `v1.0.1` gibi Git tag'leri ile oluşturulur.
+Release işlemi manuel olarak oluşturulan `v1.0.0`, `v1.0.1`, `v1.0.2` gibi Git tag'leriyle başlatılıyor.
 
-## Container Registry
+## Docker ve GHCR
 
-Docker image'ları GitHub Container Registry üzerinde tutulmaktadır.
+Backend ve frontend ayrı Docker image'ları olarak paketleniyor.
 
-```text
-ghcr.io/emreeaarslan/cicd-backend
-ghcr.io/emreeaarslan/cicd-frontend
-```
+- `ghcr.io/emreeaarslan/cicd-backend`
+- `ghcr.io/emreeaarslan/cicd-frontend`
 
-Örnek release image'ları:
+Güncel release örneği:
 
-```text
-ghcr.io/emreeaarslan/cicd-backend:v1.0.1
-ghcr.io/emreeaarslan/cicd-frontend:v1.0.1
-```
+- `ghcr.io/emreeaarslan/cicd-backend:v1.0.2`
+- `ghcr.io/emreeaarslan/cicd-frontend:v1.0.2`
 
-## Multi-Platform Images
+İlk release image'ları yalnızca `linux/amd64` platformunda oluşturulmuştu.
 
-İlk release image'ları GitHub-hosted runner üzerinde yalnızca `linux/amd64` olarak oluşturulmuştu.
+Minikube node'unun `arm64` olduğu görüldükten sonra pipeline'a QEMU ve Docker Buildx multi-platform desteği eklendi.
 
-Local Minikube node'unun `arm64` olduğu doğrulandıktan sonra pipeline'a QEMU ve multi-platform Buildx desteği eklendi.
+Image'lar artık:
 
-Güncel image'lar iki mimariyi desteklemektedir:
+- `linux/amd64`
+- `linux/arm64`
 
-```text
-linux/amd64
-linux/arm64
-```
-
-Bu sayede aynı image tag'i hem AMD64 hem ARM64 Kubernetes node'larında kullanılabilir.
-
-## CI/CD Pipeline
-
-```mermaid
-flowchart TD
-    FEAT[feature/*] --> CI[Tests + Docker Build Validation]
-    CI --> DEV[dev]
-    DEV --> DP[Tests + Multi-platform Build]
-    DP --> GHCRDEV[GHCR dev-SHA Images]
-
-    DEV --> PR[Pull Request to main]
-    PR --> MAIN[main]
-
-    MAIN --> TAG[v1.x.x Tag]
-    TAG --> REL[Release Job]
-    REL --> GHCR[Versioned GHCR Images]
-    REL --> GR[GitHub Release]
-```
-
-GitHub Actions'ın sorumlulukları test, Docker build, image publishing ve GitHub Release oluşturmaktır.
+platformları için oluşturuluyor.
 
 ## Kubernetes
 
-Local Kubernetes cluster için Minikube kullanılmıştır.
+Local Kubernetes ortamı olarak Minikube kullanılıyor.
 
-Uygulama dört temel Kubernetes resource ile çalışmaktadır:
+Uygulama için dört temel resource bulunuyor:
 
 - Backend Deployment
 - Backend ClusterIP Service
 - Frontend Deployment
 - Frontend NodePort Service
 
-Backend yalnızca cluster içerisinden erişilebilir. Frontend ise local ortamdan tarayıcı ile erişilebilmesi için NodePort üzerinden sunulmaktadır.
+Backend yalnızca cluster içinden erişilebilir durumda.
 
-Kontrol komutları:
+Frontend NodePort üzerinden local tarayıcıdan açılabiliyor.
 
-```bash
-kubectl get pods
-kubectl get services
-kubectl get deployments
-```
+Frontend'in Kubernetes içerisindeki backend Service'e bağlanarak backend mesajını alabildiği ayrıca kontrol edildi.
 
 ## Argo CD
 
-Argo CD, Minikube cluster'ına `argocd` namespace'i içerisinde kurulmuştur.
+Argo CD Minikube cluster'ında `argocd` namespace'i içerisinde çalışıyor.
 
-`argocd/application.yaml` dosyası Argo CD'ye aşağıdaki Git kaynağını takip etmesini söyler:
+`argocd/application.yaml`, Argo CD'ye şu kaynağı takip etmesini söylüyor:
 
-```text
-Repository : cicd-task
-Branch     : main
-Path       : k8s/
-Namespace  : default
-```
+- Repository: `cicd-task`
+- Branch: `main`
+- Path: `k8s/`
+- Destination namespace: `default`
 
-Deployment akışı:
+Automated sync açık. Ayrıca `prune` ve `selfHeal` aktif.
 
-```mermaid
-flowchart TD
-    G[GitHub main / k8s] --> A[Argo CD]
-    A --> K[Kubernetes]
-    K --> F[Frontend]
-    K --> B[Backend]
-```
+Argo CD Application durumu çalışır durumda `Synced` ve `Healthy` olarak doğrulandı.
 
-Automated sync yapılandırmasında `prune` ve `selfHeal` aktiftir.
+## Release ve Argo CD Akışı
 
-```yaml
-syncPolicy:
-  automated:
-    prune: true
-    selfHeal: true
-```
+Release pipeline'ın son hali:
 
-## GitOps Verification
+**Git tag → GitHub Actions → Test → Docker Build → GHCR → Kubernetes manifest update → Git main → Argo CD → Kubernetes**
 
-Argo CD'nin deployment yönetimini gerçekten devraldığı ayrıca test edilmiştir.
+Örneğin `v1.0.2` tag'i oluşturulduğunda GitHub Actions:
 
-Başlangıçta backend:
+1. Backend ve frontend testlerini çalıştırdı.
+2. İki servis için `v1.0.2` multi-platform image'larını oluşturdu.
+3. Image'ları GHCR'ye gönderdi.
+4. `k8s/backend.yaml` ve `k8s/frontend.yaml` içerisindeki image tag'lerini `v1.0.1` değerinden `v1.0.2` değerine güncelledi.
+5. Manifest değişikliklerini `main` branch'ine commit ve push etti.
+6. GitHub Release oluşturdu.
 
-```text
-replicas: 1
-```
+GitHub Actions Kubernetes'e doğrudan deploy etmiyor. Workflow içerisinde `kubectl apply` veya manuel Argo CD sync işlemi bulunmuyor.
 
-olarak çalışıyordu.
+Manifest `main` branch'inde değiştikten sonra Argo CD yeni desired state'i algılayıp Kubernetes Deployment'larını `v1.0.2` image'larına geçirdi.
 
-Git repository içerisindeki manifest:
+Argo CD arayüzünde backend Live Manifest içerisinde `ghcr.io/emreeaarslan/cicd-backend:v1.0.2` image'ı görüldü ve uygulama `Synced / Healthy` durumuna geldi.
 
-```yaml
-replicas: 2
-```
+Son olarak frontend üzerinden backend çağrısı yapıldığında yeni release içerisindeki `Backend service is running - v1.0.2` mesajı alındı.
 
-olarak değiştirildi.
+## GitOps Kontrolü
 
-Değişiklik feature ve `dev` branch'lerinde bulunduğu sürece cluster değişmedi, çünkü Argo CD yalnızca `main` branch'ini takip etmektedir.
+Argo CD'nin yalnızca `main` branch'ini takip ettiği ayrıca replica değişikliğiyle test edildi.
 
-Değişiklik `main` branch'ine merge edildikten sonra herhangi bir manuel `kubectl apply` komutu çalıştırılmadan Argo CD Kubernetes deployment'ını otomatik olarak güncelledi.
+Backend replica sayısı feature ve `dev` branch'lerinde `2` yapılmasına rağmen cluster `1/1` olarak kaldı.
 
-Sonuç:
+Değişiklik `main` branch'ine girdikten sonra herhangi bir manuel `kubectl apply` kullanılmadan backend Deployment otomatik olarak `2/2` durumuna geçti.
 
-```text
-NAME      READY   UP-TO-DATE   AVAILABLE
-backend   2/2     2            2
-```
+Bu kontrolle Git'teki desired state ile Kubernetes cluster'ın Argo CD tarafından senkronize edildiği doğrulandı.
 
-Argo CD durumu:
+## Sorumluluk Ayrımı
 
-```text
-NAME        SYNC STATUS   HEALTH STATUS
-cicd-task   Synced        Healthy
-```
+**GitHub Actions**
 
-Bu test, deployment işleminin manuel `kubectl apply` yerine Argo CD tarafından GitOps modeliyle yönetildiğini doğrulamaktadır.
+- Testleri çalıştırır.
+- Docker image'larını oluşturur.
+- Image'ları GHCR'ye gönderir.
+- GitHub Release oluşturur.
+- Release edilen image version'ını Kubernetes manifestlerine yazar.
 
-## Responsibility Boundary
+**Argo CD**
 
-```mermaid
-flowchart LR
-    C[Code] --> GA[GitHub Actions]
-    GA --> T[Tests]
-    GA --> I[Docker Images]
-    I --> R[GHCR]
+- `main/k8s` içerisindeki desired state'i takip eder.
+- Git değişikliklerini Kubernetes'e uygular.
+- Cluster'ı Git repository ile senkronize tutar.
 
-    G[Git main / k8s] --> A[Argo CD]
-    A --> K[Kubernetes]
-```
-
-**GitHub Actions:** test, Docker build, image push ve release.
-
-**Argo CD:** Git repository'deki Kubernetes desired state'ini cluster'a uygulama ve senkronize tutma.
-
-## Local Commands
-
-Uygulamayı Docker Compose ile çalıştırmak:
-
-```bash
-docker compose up --build -d
-```
-
-Kubernetes durumunu kontrol etmek:
-
-```bash
-kubectl get pods
-kubectl get services
-```
-
-Argo CD Application durumunu kontrol etmek:
-
-```bash
-kubectl get applications -n argocd
-```
+Bu yapıda CI ve release hazırlığı GitHub Actions tarafında, Kubernetes deployment ise Argo CD tarafında yönetiliyor.
