@@ -8,9 +8,9 @@ RUN python -m pip install \
     --no-cache-dir \
     -r requirements.txt
 
-COPY app.py .
+COPY app.py logging_config.py metrics_config.py telemetry_config.py ./
 COPY templates ./templates
 
 EXPOSE 5002
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5002", "app:app"]

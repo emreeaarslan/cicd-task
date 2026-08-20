@@ -17,6 +17,44 @@ spec:
           image: ghcr.io/emreeaarslan/cicd-backend:v1.0.2
           ports:
             - containerPort: 5001
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cluster-app
+                  key: uri
+
+            - name: OTEL_TRACING_ENABLED
+              value: "true"
+
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://otel-collector:4318/v1/traces"
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 15
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5001
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
 ---
 apiVersion: v1
 kind: Service
