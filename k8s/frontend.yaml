@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/emreeaarslan/cicd-frontend:v1.0.2
+          image: ghcr.io/emreeaarslan/cicd-frontend:v1.1.0
           ports:
             - containerPort: 5002
 
