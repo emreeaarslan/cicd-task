@@ -17,7 +17,7 @@ app = Flask(__name__)
 configure_tracing(app)
 logger = configure_logger("backend")
 
-DEFAULT_MESSAGE = "Backend service is running - v1.0.2"
+DEFAULT_MESSAGE = "Backend service is running"
 
 
 @app.before_request
