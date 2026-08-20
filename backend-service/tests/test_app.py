@@ -30,7 +30,7 @@ def test_message_endpoint_preserves_frontend_contract(client, monkeypatch):
     monkeypatch.setattr(
         app_module,
         "get_latest_message",
-        lambda: "Backend service is running - v1.0.2",
+        lambda: "Backend service is running",
     )
 
     response = client.get("/api/message")
@@ -39,7 +39,7 @@ def test_message_endpoint_preserves_frontend_contract(client, monkeypatch):
     assert response.is_json
     assert response.get_json() == {
         "service": "backend",
-        "message": "Backend service is running - v1.0.2",
+        "message": "Backend service is running",
     }
 
 
