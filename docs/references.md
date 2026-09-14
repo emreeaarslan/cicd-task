@@ -102,6 +102,12 @@ https://docs.docker.com/build/ci/github-actions/multi-platform/
 
 GitHub Actions pipeline'ına QEMU, Docker Buildx ve `linux/amd64,linux/arm64` desteği eklemek için kullanıldı.
 
+### Server-Side Apply Sync Option
+
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
+
+Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
+
 ## GitHub Actions
 
 ### Workflow Syntax
@@ -128,6 +134,12 @@ https://docs.github.com/actions/concepts/security/github_token
 
 Release workflow'unda GHCR publish, GitHub Release ve repository üzerinde manifest commit işlemlerinde kullanılan token davranışını anlamak için kullanıldı.
 
+### Server-Side Apply Sync Option
+
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
+
+Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
+
 ## GitHub Container Registry
 
 ### Working with the Container Registry
@@ -135,6 +147,12 @@ Release workflow'unda GHCR publish, GitHub Release ve repository üzerinde manif
 https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry
 
 Backend ve frontend Docker image'larının GHCR üzerinde tutulması ve GitHub Actions tarafından publish edilmesi için kullanıldı.
+
+### Server-Side Apply Sync Option
+
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
+
+Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
 
 ## GitHub Releases
 
@@ -182,6 +200,30 @@ https://kubernetes.io/docs/concepts/containers/images/
 
 Kubernetes image tag ve image platform davranışını anlamak için kullanıldı.
 
+### StatefulSets
+
+https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+
+Redis Operator tarafından oluşturulan StatefulSet'in stable identity, headless Service ve `volumeClaimTemplates` yapısını incelemek için kullanıldı.
+
+### EndpointSlices
+
+https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/
+
+CloudNativePG `rw`, `ro` ve `r` Service'lerinin canlı olarak hangi PostgreSQL Pod IP'lerine yöneldiğini doğrulamak için kullanıldı.
+
+### ConfigMaps
+
+https://kubernetes.io/docs/concepts/configuration/configmap/
+
+Grafana datasource ve dashboard provisioning dosyalarının Kubernetes ConfigMap'leri üzerinden taşınması için referans alındı.
+
+### Custom Resources
+
+https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+
+CloudNativePG `Cluster`, Redis `RedisReplication` ve `RedisSentinel` gibi operator tarafından yönetilen custom resource/CRD yapısını anlamak için kullanıldı.
+
 ## k3d
 
 ### Using Config Files
@@ -190,7 +232,31 @@ https://k3d.io/stable/usage/configfile/
 
 `k3d/cluster.yaml` ile 1 server ve 2 agent node içeren local Kubernetes cluster tanımlamak için kullanıldı.
 
-### k3d Command Documentation
+#### StatefulSets
+
+https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+
+Redis Operator tarafından oluşturulan StatefulSet'in stable identity, headless Service ve `volumeClaimTemplates` yapısını incelemek için kullanıldı.
+
+### EndpointSlices
+
+https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/
+
+CloudNativePG `rw`, `ro` ve `r` Service'lerinin canlı olarak hangi PostgreSQL Pod IP'lerine yöneldiğini doğrulamak için kullanıldı.
+
+### ConfigMaps
+
+https://kubernetes.io/docs/concepts/configuration/configmap/
+
+Grafana datasource ve dashboard provisioning dosyalarının Kubernetes ConfigMap'leri üzerinden taşınması için referans alındı.
+
+### Custom Resources
+
+https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+
+CloudNativePG `Cluster`, Redis `RedisReplication` ve `RedisSentinel` gibi operator tarafından yönetilen custom resource/CRD yapısını anlamak için kullanıldı.
+
+## k3d Command Documentation
 
 https://k3d.io/stable/usage/commands/
 
@@ -272,6 +338,68 @@ https://prometheus.github.io/client_python/
 
 Flask servislerinde Counter, Histogram ve `/metrics` endpoint'i oluşturmak için kullanıldı.
 
+## Grafana
+
+### Provision Dashboards and Data Sources
+
+https://grafana.com/tutorials/provision-dashboards-and-data-sources/
+
+Grafana datasource ve dashboard'larını version-controlled configuration ile provisioning/as-code olarak yönetmek için kullanıldı.
+
+### Prometheus Data Source
+
+https://grafana.com/docs/grafana/latest/datasources/prometheus/
+
+Grafana'nın Prometheus datasource'u ve PromQL tabanlı metric sorgulama yapısı için kullanıldı.
+
+### Build Dashboards
+
+https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/
+
+Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
+
+## Helm
+
+### Helm Documentation
+
+https://helm.sh/docs/
+
+OpsTree Redis Operator chart repository'sini eklemek ve operator'ü version-pinned Helm release olarak kurmak için kullanıldı.
+
+## Redis
+
+### High Availability with Redis Sentinel
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/
+
+Redis Sentinel monitoring, quorum, automatic failover ve replica promotion davranışını anlamak ve Sentinel seçimini gerekçelendirmek için kullanıldı.
+
+### Scale with Redis Cluster
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/
+
+Redis Cluster'ın veriyi shard ederek horizontal scaling sağlaması ile Sentinel tabanlı HA yaklaşımı arasındaki farkı değerlendirmek için kullanıldı.
+
+### Redis Replication
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+
+Primary-replica veri replikasyonu ve failover sonrası replica ilişkilerini anlamak için kullanıldı.
+
+## OpsTree Redis Operator
+
+### Redis Operator Installation
+
+https://github.com/OT-CONTAINER-KIT/redis-operator/blob/main/docs/content/en/docs/Installation/Installation/_index.md
+
+Redis Operator'ın Helm ile kurulması ve `RedisReplication` / `RedisSentinel` CRD'lerinin kullanılması için referans alındı.
+
+### Redis Operator Repository
+
+https://github.com/OT-CONTAINER-KIT/redis-operator
+
+Operator'ın Redis replication, Sentinel ve Kubernetes resource yönetimi davranışlarını incelemek için kullanıldı.
+
 ## OpenTelemetry
 
 ### Traces
@@ -286,7 +414,69 @@ https://opentelemetry.io/docs/concepts/context-propagation/
 
 Frontend → backend çağrısında aynı distributed trace context'inin servisler arasında taşınması için referans alındı.
 
-### OpenTelemetry Collector
+### Grafana
+
+### Provision Dashboards and Data Sources
+
+https://grafana.com/tutorials/provision-dashboards-and-data-sources/
+
+Grafana datasource ve dashboard'larını version-controlled configuration ile provisioning/as-code olarak yönetmek için kullanıldı.
+
+### Prometheus Data Source
+
+https://grafana.com/docs/grafana/latest/datasources/prometheus/
+
+Grafana'nın Prometheus datasource'u ve PromQL tabanlı metric sorgulama yapısı için kullanıldı.
+
+### Build Dashboards
+
+https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/
+
+Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
+
+## Helm
+
+### Helm Documentation
+
+https://helm.sh/docs/
+
+OpsTree Redis Operator chart repository'sini eklemek ve operator'ü version-pinned Helm release olarak kurmak için kullanıldı.
+
+## Redis
+
+### High Availability with Redis Sentinel
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/
+
+Redis Sentinel monitoring, quorum, automatic failover ve replica promotion davranışını anlamak ve Sentinel seçimini gerekçelendirmek için kullanıldı.
+
+### Scale with Redis Cluster
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/
+
+Redis Cluster'ın veriyi shard ederek horizontal scaling sağlaması ile Sentinel tabanlı HA yaklaşımı arasındaki farkı değerlendirmek için kullanıldı.
+
+### Redis Replication
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+
+Primary-replica veri replikasyonu ve failover sonrası replica ilişkilerini anlamak için kullanıldı.
+
+## OpsTree Redis Operator
+
+### Redis Operator Installation
+
+https://github.com/OT-CONTAINER-KIT/redis-operator/blob/main/docs/content/en/docs/Installation/Installation/_index.md
+
+Redis Operator'ın Helm ile kurulması ve `RedisReplication` / `RedisSentinel` CRD'lerinin kullanılması için referans alındı.
+
+### Redis Operator Repository
+
+https://github.com/OT-CONTAINER-KIT/redis-operator
+
+Operator'ın Redis replication, Sentinel ve Kubernetes resource yönetimi davranışlarını incelemek için kullanıldı.
+
+## OpenTelemetry Collector
 
 https://opentelemetry.io/docs/collector/
 
@@ -304,7 +494,69 @@ https://opentelemetry.io/docs/specs/otlp/
 
 Uygulama trace'lerinin OTLP/HTTP ile Collector'a gönderilmesi için kullanılan protokolü anlamak için referans alındı.
 
-### OpenTelemetry Python
+### Grafana
+
+### Provision Dashboards and Data Sources
+
+https://grafana.com/tutorials/provision-dashboards-and-data-sources/
+
+Grafana datasource ve dashboard'larını version-controlled configuration ile provisioning/as-code olarak yönetmek için kullanıldı.
+
+### Prometheus Data Source
+
+https://grafana.com/docs/grafana/latest/datasources/prometheus/
+
+Grafana'nın Prometheus datasource'u ve PromQL tabanlı metric sorgulama yapısı için kullanıldı.
+
+### Build Dashboards
+
+https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/
+
+Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
+
+## Helm
+
+### Helm Documentation
+
+https://helm.sh/docs/
+
+OpsTree Redis Operator chart repository'sini eklemek ve operator'ü version-pinned Helm release olarak kurmak için kullanıldı.
+
+## Redis
+
+### High Availability with Redis Sentinel
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/
+
+Redis Sentinel monitoring, quorum, automatic failover ve replica promotion davranışını anlamak ve Sentinel seçimini gerekçelendirmek için kullanıldı.
+
+### Scale with Redis Cluster
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/
+
+Redis Cluster'ın veriyi shard ederek horizontal scaling sağlaması ile Sentinel tabanlı HA yaklaşımı arasındaki farkı değerlendirmek için kullanıldı.
+
+### Redis Replication
+
+https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+
+Primary-replica veri replikasyonu ve failover sonrası replica ilişkilerini anlamak için kullanıldı.
+
+## OpsTree Redis Operator
+
+### Redis Operator Installation
+
+https://github.com/OT-CONTAINER-KIT/redis-operator/blob/main/docs/content/en/docs/Installation/Installation/_index.md
+
+Redis Operator'ın Helm ile kurulması ve `RedisReplication` / `RedisSentinel` CRD'lerinin kullanılması için referans alındı.
+
+### Redis Operator Repository
+
+https://github.com/OT-CONTAINER-KIT/redis-operator
+
+Operator'ın Redis replication, Sentinel ve Kubernetes resource yönetimi davranışlarını incelemek için kullanıldı.
+
+## OpenTelemetry Python
 
 https://opentelemetry.io/docs/languages/python/
 
@@ -362,9 +614,21 @@ Release pipeline'ın yeni image'ı registry'ye gönderdikten sonra Git'teki Kube
 
 Projede GitHub Actions release sırasında image'ları GHCR'ye publish eder ve Kubernetes manifestlerindeki image tag'lerini `main` branch'inde günceller. Argo CD ise `main/k8s` desired state'ini takip ederek Kubernetes deployment'ını gerçekleştirir.
 
+### Server-Side Apply Sync Option
+
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
+
+Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
+
 ## Git
 
-### Git Documentation
+#### Server-Side Apply Sync Option
+
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
+
+Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
+
+## Git Documentation
 
 https://git-scm.com/docs
 
