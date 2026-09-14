@@ -1,0 +1,54 @@
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisReplication
+metadata:
+  name: redis-replication
+  namespace: default
+spec:
+  clusterSize: 3
+
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.0.15
+    imagePullPolicy: IfNotPresent
+    redisSecret:
+      name: redis-secret
+      key: password
+
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisSentinel
+metadata:
+  name: redis-sentinel
+  namespace: default
+spec:
+  clusterSize: 3
+
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+
+  redisSentinelConfig:
+    redisReplicationName: redis-replication
+    redisReplicationPassword:
+      secretKeyRef:
+        name: redis-secret
+        key: password
+
+  kubernetesConfig:
+    image: quay.io/opstree/redis-sentinel:v7.0.15
+    imagePullPolicy: IfNotPresent
+    redisSecret:
+      name: redis-secret
+      key: password
