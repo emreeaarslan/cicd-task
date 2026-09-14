@@ -10,4 +10,4 @@ COPY app.py db.py logging_config.py metrics_config.py telemetry_config.py ./
 
 EXPOSE 5001
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5001", "app:app"]
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:5001", "app:app"]

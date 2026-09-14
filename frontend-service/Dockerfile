@@ -13,4 +13,4 @@ COPY templates ./templates
 
 EXPOSE 5002
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5002", "app:app"]
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:5002", "app:app"]
