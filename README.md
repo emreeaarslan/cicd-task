@@ -1,8 +1,115 @@
 # Two-Service CI/CD Pipeline with Argo CD
 
-İki Flask servisinden oluşan örnek uygulama için branch bazlı CI/CD pipeline, Kubernetes üzerinde PostgreSQL HA/persistence, observability ve Argo CD ile GitOps deployment akışı.
+İki Flask servisinden oluşan örnek uygulama için branch bazlı CI/CD, Kubernetes üzerinde PostgreSQL ve Redis HA, observability ve Argo CD ile GitOps deployment akışı.
 
-## Genel Mimari
+## Quick Start
+
+Gereksinimler:
+
+- Git
+- Docker Desktop
+- Python 3
+- kubectl
+- k3d
+- Helm
+
+Repository:
+
+```bash
+git clone https://github.com/emreeaarslan/cicd-task.git
+cd cicd-task
+```
+
+k3d cluster:
+
+```bash
+k3d cluster create --config k3d/cluster.yaml
+kubectl get nodes
+```
+
+CloudNativePG operator:
+
+```bash
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml
+
+kubectl rollout status deployment \
+  -n cnpg-system cnpg-controller-manager
+```
+
+Redis Operator:
+
+```bash
+helm repo add ot-helm https://ot-container-kit.github.io/helm-charts/
+helm repo update
+
+helm upgrade --install redis-operator ot-helm/redis-operator \
+  --version 0.26.1 \
+  --namespace ot-operators \
+  --create-namespace
+```
+
+Redis Secret:
+
+```bash
+REDIS_PASSWORD="$(openssl rand -base64 24)"
+
+kubectl create secret generic redis-secret \
+  --from-literal=password="$REDIS_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+unset REDIS_PASSWORD
+```
+
+Argo CD:
+
+```bash
+kubectl create namespace argocd
+
+kubectl apply -n argocd --server-side --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Argo CD Application:
+
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+Durum kontrolü:
+
+```bash
+kubectl get pods
+kubectl get cluster postgres-cluster
+kubectl get redisreplication,redissentinel
+kubectl get applications.argoproj.io -n argocd
+```
+
+Frontend:
+
+```bash
+kubectl port-forward svc/frontend 5002:5002
+```
+
+Tarayıcı:
+
+```text
+http://localhost:5002
+```
+
+Prometheus ve Grafana:
+
+```bash
+kubectl port-forward svc/prometheus 9090:9090
+kubectl port-forward svc/grafana 3000:3000
+```
+
+```text
+Prometheus: http://localhost:9090
+Grafana:    http://localhost:3000
+```
+
+## Mimari
 
 ```text
 GitHub
@@ -11,11 +118,10 @@ GitHub
   │        │
   │        ▼
   │   GitHub Actions
-  │   ├─ Backend tests
-  │   ├─ Frontend tests
-  │   ├─ Multi-platform Docker build
+  │   ├─ tests
+  │   ├─ multi-platform Docker build
   │   ├─ GHCR publish
-  │   └─ Release sırasında Kubernetes image tag update
+  │   └─ release sırasında image tag update
   │
   └─ main/k8s
            │
@@ -27,72 +133,64 @@ GitHub
            │
            ├─ Frontend (Gunicorn)
            ├─ Backend (Gunicorn)
-           ├─ CloudNativePG PostgreSQL HA cluster
+           ├─ PostgreSQL HA (CloudNativePG)
+           ├─ Redis Replication + Sentinel
            ├─ OpenTelemetry Collector
-           └─ Prometheus
+           ├─ Prometheus
+           └─ Grafana
 ```
 
 Uygulama akışı:
 
 ```text
 Browser
-  │
-  ▼
+  ↓
 Frontend :5002
-  │
-  ▼
+  ↓
 Backend :5001
-  │
-  ▼
+  ↓
 PostgreSQL HA cluster
 ```
 
-Observability akışı:
+Observability:
 
 ```text
 Frontend / Backend
-  ├─ JSON structured logs ──> stdout / kubectl logs
-  ├─ Prometheus metrics ────> Prometheus
-  └─ OpenTelemetry traces ──> OTel Collector
+  ├─ JSON logs ───────────────> stdout / kubectl logs
+  ├─ Prometheus metrics ──────> Prometheus ──> Grafana
+  └─ OpenTelemetry traces ────> OTel Collector
 
 CloudNativePG PostgreSQL
-  └─ built-in metrics :9187 ─> Prometheus
+  └─ built-in metrics :9187 ──> Prometheus ──> Grafana
 ```
 
-## Özellikler
-
-- İki ayrı Flask servis: frontend ve backend
-- Backend için PostgreSQL persistence
-- CloudNativePG ile 3 instance PostgreSQL HA cluster
-- Backend ve frontend için Gunicorn
-- Kubernetes startup, readiness ve liveness health probe'ları
-- k3d üzerinde 1 server + 2 agent node
-- JSON structured logging
-- OpenTelemetry distributed tracing
-- Frontend ve backend için Prometheus metrics
-- PostgreSQL için CloudNativePG built-in Prometheus metrics
-- Cluster içinde Prometheus Server ve Web UI
-- GitHub Actions ile branch bazlı test/build/release akışı
-- GHCR üzerinde multi-platform (`linux/amd64`, `linux/arm64`) image'lar
-- Argo CD ile GitOps deployment, automated sync, prune ve self-heal
-
-## Görev Kapsamı Kontrolü
-
-Değerlendirme kapsamında istenen maddelerin projedeki karşılığı:
+## Görev Kapsamı
 
 | İstenen | Projedeki karşılığı |
 | --- | --- |
-| Backend için PostgreSQL persistence | Backend `DATABASE_URL` ile PostgreSQL'e bağlanır; mesajlar DB'ye yazılır ve DB'den okunur |
-| PostgreSQL HA ve cluster içinde çalışma | CloudNativePG `Cluster`, `instances: 3`, Kubernetes `default` namespace |
-| Frontend + backend healthcheck | Uygulama health endpoint'leri ve Kubernetes startup/readiness/liveness probe'ları |
-| İki uygulamanın Gunicorn ile serve edilmesi | Her iki Dockerfile da `gunicorn ... app:app` ile başlatılır |
-| Minikube yerine k3d | Final local Kubernetes ortamı `k3d/cluster.yaml` ile oluşturulan k3d cluster'dır |
-| Structured logging | Frontend ve backend JSON request loglarını stdout'a yazar |
-| OTel traces | Flask/Requests/Psycopg instrumentation → OTLP/HTTP → OpenTelemetry Collector |
-| Prometheus metrics: frontend + backend | Her iki serviste `/metrics`, Counter ve Histogram metrikleri |
-| Prometheus metrics: PostgreSQL | CloudNativePG PostgreSQL instance exporter metrikleri Prometheus tarafından scrape edilir |
-
-Minikube final çalışma ortamının parçası değildir. `docker-compose.yaml` yalnızca basit local geliştirme/karşılaştırma için repoda tutulur; final Kubernetes çalıştırma ve değerlendirme ortamı k3d'dir.
+| En az iki servis | Flask frontend + backend |
+| Branch bazlı pipeline | feature / PR / dev / main davranışları |
+| Test ve paketleme | pytest + Docker build |
+| Release | Semantic version tag + GHCR + GitHub Release |
+| Deployment Argo CD'ye devredilsin | GitHub Actions manifesti günceller, Argo CD deploy eder |
+| PostgreSQL persistence | Backend veriyi PostgreSQL'e yazar/okur |
+| PostgreSQL HA | CloudNativePG, 3 instance |
+| Frontend/backend healthcheck | startup, readiness, liveness probe'ları |
+| Gunicorn | İki servis de `--workers 1` ile serve edilir |
+| Minikube yerine k3d | 1 server + 2 agent k3d cluster |
+| Structured logging | JSON request logları |
+| OTel traces | Flask/Requests/Psycopg → OTel Collector |
+| Prometheus metrics | Frontend, backend ve PostgreSQL |
+| StatefulSet/operator incelemesi | Redis StatefulSet üretir; CNPG PostgreSQL için StatefulSet kullanmaz |
+| DB primary/secondary Service yapısı | CNPG `rw`, `ro`, `r` Service'leri |
+| Grafana + Prometheus bağlantısı | Prometheus datasource provisioning |
+| Grafana as code | Datasource ve dashboard'lar ConfigMap ile |
+| DB dashboard | CloudNativePG hazır dashboard'u |
+| Uygulama dashboard'u | `Application Overview` |
+| Redis Operator | OpsTree Redis Operator |
+| Redis storage | 3 x 1 Gi PVC |
+| Redis HA/failover | 1 primary + 2 replica + 3 Sentinel |
+| Sentinel vs Cluster seçimi | Sharding gerekmediği için Sentinel |
 
 ## Proje Yapısı
 
@@ -100,14 +198,21 @@ Minikube final çalışma ortamının parçası değildir. `docker-compose.yaml`
 .
 ├── backend-service/
 ├── frontend-service/
+├── grafana/
+│   └── dashboards/
+│       ├── application-overview.json
+│       └── cloudnativepg.json
 ├── k3d/
 │   └── cluster.yaml
 ├── k8s/
 │   ├── backend.yaml
 │   ├── frontend.yaml
 │   ├── postgres.yaml
+│   ├── redis.yaml
 │   ├── otel-collector.yaml
-│   └── prometheus.yaml
+│   ├── prometheus.yaml
+│   ├── grafana.yaml
+│   └── grafana-dashboards.yaml
 ├── argocd/
 │   └── application.yaml
 ├── .github/
@@ -118,33 +223,7 @@ Minikube final çalışma ortamının parçası değildir. `docker-compose.yaml`
 └── docker-compose.yaml
 ```
 
-## Gereksinimler
-
-Final Kubernetes ortamı için:
-
-- Git
-- Docker Desktop
-- Python 3
-- kubectl
-- k3d
-
-Argo CD ve CloudNativePG operator cluster'a ayrıca kurulur.
-
-## Repository'yi Klonlama
-
-```bash
-git clone https://github.com/emreeaarslan/cicd-task.git
-cd cicd-task
-```
-
 ## Local Testler
-
-Virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
 
 Backend:
 
@@ -164,154 +243,113 @@ python -m pytest -v
 cd ..
 ```
 
-## k3d Cluster
-
-Cluster repository içindeki config ile oluşturulur:
+Docker build:
 
 ```bash
-k3d cluster create --config k3d/cluster.yaml
+docker build -t cicd-backend:check ./backend-service
+docker build -t cicd-frontend:check ./frontend-service
 ```
 
-Config:
+## PostgreSQL HA ve Persistence
+
+CloudNativePG cluster:
 
 ```text
-1 server
-2 agents
+3 PostgreSQL instance
+1 primary
+2 replica
+3 x 1 Gi persistent PVC
 ```
 
-Kontrol:
+Durum:
 
 ```bash
-kubectl config current-context
-kubectl get nodes
+kubectl get cluster postgres-cluster
+kubectl get pods -l cnpg.io/cluster=postgres-cluster
+kubectl get pvc | grep postgres-cluster
 ```
 
-Beklenen context:
+### StatefulSet ve Operator Yapısı
+
+CloudNativePG bu projede PostgreSQL'i Kubernetes `StatefulSet` resource'u ile yönetmez.
+
+PostgreSQL Pod ve PVC'lerinin owner'ı:
 
 ```text
-k3d-cicd-cluster
+Cluster/postgres-cluster
 ```
 
-### k3d Üzerindeki Frontend'e Erişim
+CNPG kendi `Cluster` custom resource'u üzerinden Pod, PVC ve Service'leri reconcile eder.
 
-Final uygulama Kubernetes içinde k3d üzerinde çalışır. Frontend Service'i local tarayıcıya açmak için:
+Redis Operator ise `RedisReplication` custom resource'undan StatefulSet üretir. Böylece iki operator'ın stateful workload yönetimindeki yaklaşımı karşılaştırılmıştır.
 
-```bash
-kubectl port-forward svc/frontend 5002:5002
-```
+### Primary / Replica Service'leri
 
-Ardından:
+CloudNativePG tarafından yönetilen Service'ler:
 
 ```text
-http://localhost:5002
+postgres-cluster-rw → primary
+postgres-cluster-ro → replica'lar
+postgres-cluster-r  → okunabilir tüm instance'lar
 ```
 
-adresinden frontend kullanılabilir. Frontend, cluster içinde backend Service'e `http://backend:5001` üzerinden ulaşır.
-
-## CloudNativePG Operator
-
-`k8s/postgres.yaml` bir CloudNativePG `Cluster` resource'u kullandığı için önce operator kurulmalıdır.
-
-Bu projede kullanılan 1.30 serisi için:
-
-```bash
-kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml
-```
-
-Operator kontrolü:
-
-```bash
-kubectl rollout status deployment \
-  -n cnpg-system cnpg-controller-manager
-```
-
-PostgreSQL cluster, uygulama manifestleri Argo CD tarafından sync edildiğinde oluşturulur.
-
-## Argo CD Kurulumu
-
-Namespace:
-
-```bash
-kubectl create namespace argocd
-```
-
-Kurulum:
-
-```bash
-kubectl apply -n argocd --server-side --force-conflicts \
-  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-```
-
-Kontrol:
-
-```bash
-kubectl get pods -n argocd
-```
-
-UI için:
-
-```bash
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-```
-
-Tarayıcı:
+Selector'lar:
 
 ```text
-https://localhost:8080
+-rw → cnpg.io/instanceRole=primary
+-ro → cnpg.io/instanceRole=replica
+-r  → cnpg.io/podRole=instance
 ```
 
-## Argo CD Application
+Backend primary Pod IP'sini bilmez.
 
-`argocd/application.yaml` şu desired state'i takip eder:
+`DATABASE_URL`, CloudNativePG'nin oluşturduğu `postgres-cluster-app` Secret içindeki `uri` key'inden alınır. Bu bağlantının host'u `postgres-cluster-rw` Service'idir.
 
-- Repository: `https://github.com/emreeaarslan/cicd-task.git`
-- Branch: `main`
-- Path: `k8s`
-- Destination: aynı Kubernetes cluster
-- Namespace: `default`
+Primary değiştiğinde backend configuration değişmez; Service yeni primary role sahip Pod'a yönelir.
 
-Final `main` desired state hazır olduğunda:
+## Redis HA
 
-```bash
-kubectl apply -f argocd/application.yaml
-```
+Redis, OpsTree Redis Operator ile yönetilir.
 
-Kontrol:
-
-```bash
-kubectl get applications.argoproj.io -n argocd
-```
-
-Hedef durum:
+Topoloji:
 
 ```text
-Synced
-Healthy
+RedisReplication
+  ├─ 1 primary
+  ├─ 2 replica
+  └─ 3 x 1 Gi PVC
+
+RedisSentinel
+  └─ 3 Sentinel
 ```
 
-Argo CD automated sync ile Git değişikliklerini cluster'a uygular. `selfHeal` cluster'da yapılan manuel drift'i Git'teki desired state'e geri döndürür. `prune` ise Argo tarafından yönetilen ve daha sonra Git'ten kaldırılan resource'ların temizlenmesini sağlar.
-
-## Kubernetes Uygulaması
-
-Argo CD sync sonrasında:
-
-```bash
-kubectl get pods
-kubectl get deployments
-kubectl get services
-kubectl get pvc
-```
-
-Backend iki replica olarak çalışır. Frontend backend'e Kubernetes Service DNS üzerinden erişir:
+Operator tarafından oluşturulan StatefulSet'ler:
 
 ```text
-http://backend:5001
+redis-replication
+redis-sentinel-sentinel
 ```
 
-PostgreSQL, CloudNativePG tarafından üç instance olarak yönetilir.
+### Neden Sentinel?
 
-## Health Checks
+Redis Cluster'ın temel amacı veriyi birden fazla primary arasında shard ederek horizontal scaling sağlamaktır.
+
+Bu projede sharding ihtiyacı yoktur. Gereksinim replication, persistent storage, HA ve automatic failover olduğu için Redis Replication + Sentinel seçilmiştir.
+
+### Failover Doğrulaması
+
+Failover testi sırasında:
+
+- primary'nin bulunduğu node scheduling dışına alındı,
+- primary Pod silindi,
+- Sentinel bir replica'yı yeni primary'ye promote etti,
+- `redis-replication-master` Service yeni primary'ye geçti,
+- önceden yazılmış test verisi erişilebilir kaldı,
+- eski primary geri geldiğinde replica olarak yeni primary'ye bağlandı.
+
+Bu test replication, Sentinel failover, Service yönlendirmesi ve recovery akışını doğruladı.
+
+## Health Checks ve Gunicorn
 
 Backend:
 
@@ -320,7 +358,7 @@ GET /health
 GET /health/ready
 ```
 
-Backend readiness kontrolü PostgreSQL bağlantısını da doğrular. Liveness kontrolü ise database kesintisinde gereksiz container restart döngüsü oluşturmamak için DB'den bağımsızdır.
+Backend readiness PostgreSQL bağlantısını da kontrol eder. Liveness DB'den bağımsızdır.
 
 Frontend:
 
@@ -328,47 +366,22 @@ Frontend:
 GET /health
 ```
 
-Kubernetes manifestlerinde startup, readiness ve liveness probe'ları tanımlıdır.
+Kubernetes manifestlerinde startup, readiness ve liveness probe'ları bulunur.
 
-## Gunicorn
-
-Frontend ve backend Flask development server ile değil Gunicorn ile serve edilir.
-
-Pod loglarında Gunicorn process'leri görülebilir:
-
-```bash
-kubectl logs deployment/backend
-kubectl logs deployment/frontend
-```
-
-## PostgreSQL Persistence ve HA
-
-Backend uygulama verisini PostgreSQL'e yazar ve PostgreSQL'den okur.
-
-CloudNativePG cluster:
+İki servis de Flask development server yerine Gunicorn ile çalışır:
 
 ```text
-3 PostgreSQL instance
-1 primary
-2 replica
+backend:  gunicorn --workers 1 --bind 0.0.0.0:5001 app:app
+frontend: gunicorn --workers 1 --bind 0.0.0.0:5002 app:app
 ```
 
-Durum:
+## Observability
 
-```bash
-kubectl get cluster
-kubectl get pods -l cnpg.io/cluster=postgres-cluster
-```
+### Structured Logging
 
-CloudNativePG primary failover işlemini yönetir. Bir PostgreSQL pod'u kaybedildiğinde yeni primary seçilebilir ve cluster tekrar üç instance'a tamamlanır.
+Frontend ve backend HTTP request loglarını JSON olarak stdout'a yazar.
 
-Bu repository local k3d ortamı için tasarlandığından persistence local Kubernetes storage class üzerinde çalışır; bu, production seviyesinde çok-node storage altyapısının yerini tutmaz.
-
-## Structured Logging
-
-Frontend ve backend HTTP request loglarını JSON formatında stdout'a yazar.
-
-Örnek alanlar:
+Temel alanlar:
 
 ```text
 timestamp
@@ -381,24 +394,16 @@ status
 duration_ms
 ```
 
-Logları görmek için:
-
 ```bash
 kubectl logs deployment/frontend
 kubectl logs deployment/backend
 ```
 
-Bu task kapsamında Loki/Elasticsearch gibi ayrı bir log backend'i kullanılmıyor.
-
-## OpenTelemetry Tracing
-
-Frontend ve backend OpenTelemetry ile instrument edilmiştir.
+### OpenTelemetry Tracing
 
 Tracing zinciri:
 
 ```text
-Browser
-  ↓
 Frontend Flask span
   ↓
 Frontend HTTP client span
@@ -408,23 +413,15 @@ Backend Flask span
 PostgreSQL client spans
 ```
 
-Bütün zincir aynı Trace ID üzerinden takip edilebilir.
-
-Trace'ler OTLP/HTTP ile cluster içindeki OpenTelemetry Collector'a gönderilir:
+Trace'ler OTLP/HTTP ile OTel Collector'a gönderilir:
 
 ```text
 http://otel-collector:4318/v1/traces
 ```
 
-Collector bu task kapsamında `debug` exporter kullanır. Jaeger veya Tempo eklenmemiştir.
+Collector bu task kapsamında `debug` exporter kullanır.
 
-Collector logları:
-
-```bash
-kubectl logs deployment/otel-collector
-```
-
-## Prometheus Metrics
+### Prometheus
 
 Frontend ve backend:
 
@@ -439,58 +436,61 @@ http_requests_total
 http_request_duration_seconds
 ```
 
-PostgreSQL metrics, CloudNativePG'nin built-in exporter'ı tarafından `9187` portunda expose edilir.
+PostgreSQL metrics CloudNativePG built-in exporter tarafından `9187` portunda expose edilir.
 
-Prometheus:
-
-- frontend `/metrics`
-- backend `/metrics`
-- kendi `9090` endpoint'i
-- CloudNativePG PostgreSQL pod'larının `metrics` portu
-
-target'larını scrape eder.
-
-Prometheus UI:
-
-```bash
-kubectl port-forward svc/prometheus 9090:9090
-```
-
-Tarayıcı:
-
-```text
-http://localhost:9090
-```
-
-Örnek PromQL sorguları:
+Örnek PromQL:
 
 ```promql
 up
 ```
 
 ```promql
-sum by(job, endpoint, status) (http_requests_total)
+sum by(job, status) (rate(http_requests_total[5m]))
 ```
 
 ```promql
 cnpg_collector_up
 ```
 
-```promql
-cnpg_backends_total
+### Grafana
+
+Grafana Prometheus'a cluster içindeki Service DNS üzerinden bağlanır:
+
+```text
+http://prometheus:9090
 ```
 
-Prometheus verisi için 2 GiB PVC kullanılmaktadır. Bu local k3d demo ortamına yönelik bir ayardır.
+Datasource `k8s/grafana.yaml` içindeki ConfigMap ile provision edilir.
 
-## CI Pipeline
+Dashboard'lar:
+
+```text
+grafana/dashboards/application-overview.json
+grafana/dashboards/cloudnativepg.json
+```
+
+`Application Overview`:
+
+- Request Rate
+- Requests by Status
+- Average Request Duration
+- Application Targets
+
+Dashboard JSON'ları `k8s/grafana-dashboards.yaml` içindeki ConfigMap ile provision edilir. Yeni Grafana Pod'u datasource ve dashboard'ları manuel import gerektirmeden yükler.
+
+CloudNativePG dashboard ConfigMap'i büyük olduğu için Argo CD Server-Side Apply sync option kullanılır:
+
+```text
+argocd.argoproj.io/sync-options: ServerSideApply=true
+```
+
+## CI/CD
 
 Workflow:
 
 ```text
 .github/workflows/ci.yml
 ```
-
-Branch davranışı:
 
 | Trigger | Tests | Docker Build | GHCR Push | Release |
 | --- | --- | --- | --- | --- |
@@ -500,95 +500,50 @@ Branch davranışı:
 | `main` push | Evet | Evet | Hayır | Hayır |
 | `v*.*.*` tag | Evet | Release build | `vX.Y.Z` | Evet |
 
-Backend ve frontend testleri ayrı job'larda çalışır.
-
-Docker build, test job'larına `needs` ile bağlıdır.
-
-Image'lar QEMU + Docker Buildx ile:
+Docker image'ları QEMU + Buildx ile:
 
 ```text
 linux/amd64
 linux/arm64
 ```
 
-platformları için oluşturulur.
+platformları için build edilir.
 
-## Release Akışı
+## Release ve Argo CD
 
-Release manuel Git tag'i ile başlatılır:
+Release semantic version tag ile başlatılır:
 
 ```bash
 git tag -a vX.Y.Z -m "release: vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Tag geldiğinde GitHub Actions:
-
-1. Backend ve frontend testlerini çalıştırır.
-2. Backend ve frontend release image'larını build eder.
-3. Image'ları GHCR'ye `vX.Y.Z` tag'i ile push eder.
-4. `k8s/backend.yaml` ve `k8s/frontend.yaml` image tag'lerini aynı sürüme günceller.
-5. Manifest değişikliğini `main` branch'ine commit ve push eder.
-6. GitHub Release oluşturur.
-
-Release artifact örneği:
+Release workflow:
 
 ```text
-ghcr.io/emreeaarslan/cicd-backend:vX.Y.Z
-ghcr.io/emreeaarslan/cicd-frontend:vX.Y.Z
-```
-
-## Argo CD ile GitOps Deployment
-
-GitHub Actions Kubernetes'e doğrudan deploy etmez.
-
-Workflow içerisinde release deployment için:
-
-```text
-kubectl apply
-```
-
-kullanılmaz.
-
-Sorumluluk ayrımı:
-
-```text
-GitHub Actions
-  ├─ test
-  ├─ Docker build
-  ├─ GHCR publish
-  ├─ GitHub Release
-  └─ main/k8s image tag update
-
-Argo CD
-  ├─ main/k8s desired state'i takip eder
-  ├─ Kubernetes live state ile karşılaştırır
-  ├─ sync eder
-  ├─ self-heal uygular
-  └─ gerektiğinde prune eder
-```
-
-Final deployment zinciri:
-
-```text
-Git tag
+tests
   ↓
-GitHub Actions
-  ↓
-Tests
-  ↓
-Release Docker images
+release Docker images
   ↓
 GHCR
   ↓
 main/k8s image tag update
+  ↓
+GitHub Release
   ↓
 Argo CD
   ↓
 k3d Kubernetes
 ```
 
-Bu şekilde CI/release hazırlığı GitHub Actions tarafında, Kubernetes deployment ise Argo CD tarafında tutulur.
+GitHub Actions Kubernetes'e doğrudan deploy etmez.
+
+Argo CD:
+
+- `main/k8s` desired state'ini takip eder,
+- automated sync yapar,
+- `selfHeal` ile manual drift'i geri alır,
+- `prune` ile Git'ten kaldırılan managed resource'ları temizler.
 
 ## Branch Stratejisi
 
@@ -602,17 +557,43 @@ feature/*
 vX.Y.Z
 ```
 
-Feature branch'leri geliştirme için kullanılır.
+`dev` integration branch'idir.
 
-`dev` entegrasyon branch'idir ve başarılı push'larda commit SHA ile etiketlenmiş development image'ları GHCR'ye gönderilir.
+`main`, Argo CD'nin takip ettiği release edilebilir desired state'i tutar.
 
-`main` release edilebilir kodu ve Argo CD'nin takip ettiği Kubernetes desired state'i tutar.
+## Hızlı Doğrulama
 
-Version tag release workflow'unu başlatır.
+```bash
+kubectl get nodes
+kubectl get pods
+kubectl get pvc
+kubectl get cluster postgres-cluster
+kubectl get redisreplication,redissentinel
+kubectl get applications.argoproj.io -n argocd
+```
+
+PostgreSQL Service'leri:
+
+```bash
+kubectl get svc | grep postgres-cluster
+```
+
+Redis:
+
+```bash
+kubectl get statefulset | grep redis
+kubectl get svc | grep redis
+```
+
+Grafana ve Prometheus:
+
+```bash
+kubectl get deployment grafana prometheus
+```
 
 ## Kaynaklar
 
-Kullanılan resmi dokümantasyonlar:
+Projede kullanılan resmi dokümantasyonlar:
 
 ```text
 docs/references.md
