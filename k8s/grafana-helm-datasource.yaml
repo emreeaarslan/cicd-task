@@ -6,7 +6,7 @@ metadata:
   labels:
     grafana_datasource: "1"
 data:
-  prometheus.yaml: |
+  datasources.yaml: |
     apiVersion: 1
 
     datasources:
@@ -16,4 +16,12 @@ data:
         access: proxy
         url: http://prometheus:9090
         isDefault: true
+        editable: false
+
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        access: proxy
+        url: http://tempo:3200
+        isDefault: false
         editable: false
