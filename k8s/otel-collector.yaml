@@ -13,6 +13,34 @@ data:
             endpoint: 0.0.0.0:4318
 
     processors:
+      tail_sampling:
+        decision_wait: 5s
+        num_traces: 1000
+        expected_new_traces_per_sec: 100
+        policies:
+          - name: drop-tail-ok
+            type: drop
+            drop:
+              drop_sub_policy:
+                - name: tail-ok
+                  type: and
+                  and:
+                    and_sub_policy:
+                      - name: is-tail
+                        type: string_attribute
+                        string_attribute:
+                          key: sampling.strategy
+                          values: [tail]
+
+                      - name: outcome-ok
+                        type: string_attribute
+                        string_attribute:
+                          key: sampling.outcome
+                          values: [ok]
+
+          - name: keep-everything-else
+            type: always_sample
+
       batch:
 
     exporters:
@@ -28,7 +56,7 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch]
+          processors: [tail_sampling, batch]
           exporters: [debug, otlp/tempo]
 
 ---
