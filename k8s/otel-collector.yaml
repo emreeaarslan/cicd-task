@@ -23,20 +23,11 @@ data:
             drop:
               drop_sub_policy:
                 - name: tail-ok
-                  type: and
-                  and:
-                    and_sub_policy:
-                      - name: is-tail
-                        type: string_attribute
-                        string_attribute:
-                          key: sampling.strategy
-                          values: [tail]
-
-                      - name: outcome-ok
-                        type: string_attribute
-                        string_attribute:
-                          key: sampling.outcome
-                          values: [ok]
+                  type: ottl_condition
+                  ottl_condition:
+                    error_mode: ignore
+                    span:
+                      - 'attributes["sampling.strategy"] == "tail" and attributes["sampling.outcome"] == "ok"'
 
           - name: keep-everything-else
             type: always_sample
