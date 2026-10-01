@@ -38,7 +38,7 @@ data:
       debug:
         verbosity: detailed
 
-      otlp/tempo:
+      otlp_grpc/tempo:
         endpoint: tempo:4317
         tls:
           insecure: true
@@ -48,7 +48,7 @@ data:
         traces:
           receivers: [otlp]
           processors: [tail_sampling, batch]
-          exporters: [debug, otlp/tempo]
+          exporters: [debug, otlp_grpc/tempo]
 
 ---
 apiVersion: apps/v1

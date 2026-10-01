@@ -74,6 +74,7 @@ Argo CD Application:
 
 ```bash
 kubectl apply -f argocd/application.yaml
+kubectl apply -f argocd/grafana-application.yaml
 ```
 
 Durum kontrolü:
@@ -97,16 +98,20 @@ Tarayıcı:
 http://localhost:5002
 ```
 
-Prometheus ve Grafana:
+Prometheus, Grafana ve Mailpit:
 
 ```bash
 kubectl port-forward svc/prometheus 9090:9090
-kubectl port-forward svc/grafana 3000:3000
+kubectl port-forward svc/grafana-helm 3000:80
+kubectl port-forward svc/mailpit 8025:8025
 ```
+
+Port-forward komutları ayrı terminallerde çalıştırılır.
 
 ```text
 Prometheus: http://localhost:9090
 Grafana:    http://localhost:3000
+Mailpit:    http://localhost:8025
 ```
 
 ## Mimari
@@ -123,21 +128,23 @@ GitHub
   │   ├─ GHCR publish
   │   └─ release sırasında image tag update
   │
-  └─ main/k8s
-           │
-           ▼
-        Argo CD
-           │
-           ▼
-      k3d Kubernetes
-           │
-           ├─ Frontend (Gunicorn)
-           ├─ Backend (Gunicorn)
-           ├─ PostgreSQL HA (CloudNativePG)
-           ├─ Redis Replication + Sentinel
-           ├─ OpenTelemetry Collector
-           ├─ Prometheus
-           └─ Grafana
+  ▼
+Argo CD
+  ├─ cicd-task    → main/k8s
+  └─ grafana-helm → grafana-community/grafana Helm chart
+          │
+          ▼
+     k3d Kubernetes
+          │
+          ├─ Frontend (Gunicorn)
+          ├─ Backend (Gunicorn)
+          ├─ PostgreSQL HA (CloudNativePG)
+          ├─ Redis Replication + Sentinel
+          ├─ OpenTelemetry Collector
+          ├─ Prometheus
+          ├─ Tempo
+          ├─ Mailpit
+          └─ Grafana (Helm)
 ```
 
 Uygulama akışı:
@@ -156,12 +163,15 @@ Observability:
 
 ```text
 Frontend / Backend
-  ├─ JSON logs ───────────────> stdout / kubectl logs
-  ├─ Prometheus metrics ──────> Prometheus ──> Grafana
-  └─ OpenTelemetry traces ────> OTel Collector
+  ├─ JSON logs ─────────────> stdout / kubectl logs
+  ├─ Prometheus metrics ────> Prometheus ──> Grafana
+  └─ OpenTelemetry traces ──> OTel Collector ──> Tempo ──> Grafana
 
 CloudNativePG PostgreSQL
-  └─ built-in metrics :9187 ──> Prometheus ──> Grafana
+  └─ built-in metrics :9187 ─> Prometheus ──> Grafana
+
+Grafana Alerting
+  └─ email notification ────> Mailpit
 ```
 
 ## Görev Kapsamı
@@ -183,10 +193,16 @@ CloudNativePG PostgreSQL
 | Prometheus metrics | Frontend, backend ve PostgreSQL |
 | StatefulSet/operator incelemesi | Redis StatefulSet üretir; CNPG PostgreSQL için StatefulSet kullanmaz |
 | DB primary/secondary Service yapısı | CNPG `rw`, `ro`, `r` Service'leri |
-| Grafana + Prometheus bağlantısı | Prometheus datasource provisioning |
-| Grafana as code | Datasource ve dashboard'lar ConfigMap ile |
-| DB dashboard | CloudNativePG hazır dashboard'u |
+| Grafana Helm installation | Grafana Community Helm chart + Argo CD Application |
+| Grafana datasource as code | Prometheus ve Tempo datasource'ları ConfigMap ile |
+| Grafana dashboard as code | Dashboard JSON'ları ConfigMap ile |
+| Grafana alert as code | Alert rule, contact point ve notification policy ConfigMap ile |
+| Mailpit | Grafana email alert'lerini alan SMTP + Web UI container'ı |
+| DB dashboard | CloudNativePG dashboard'u |
 | Uygulama dashboard'u | `Application Overview` |
+| Tempo tracing | OTel Collector → Tempo → Grafana Explore |
+| Head sampling | `/sampling/head`, SDK tarafında %50 sampling |
+| Tail sampling | `/sampling/tail`, Collector trace tamamlandıktan sonra karar verir |
 | Redis Operator | OpsTree Redis Operator |
 | Redis storage | 3 x 1 Gi PVC |
 | Redis HA/failover | 1 primary + 2 replica + 3 Sentinel |
@@ -209,12 +225,17 @@ CloudNativePG PostgreSQL
 │   ├── frontend.yaml
 │   ├── postgres.yaml
 │   ├── redis.yaml
-│   ├── otel-collector.yaml
 │   ├── prometheus.yaml
-│   ├── grafana.yaml
-│   └── grafana-dashboards.yaml
+│   ├── otel-collector.yaml
+│   ├── tempo.yaml
+│   ├── mailpit.yaml
+│   ├── grafana-helm-datasource.yaml
+│   ├── grafana-dashboards.yaml
+│   ├── grafana-helm-alerts.yaml
+│   └── grafana-helm-notifications.yaml
 ├── argocd/
-│   └── application.yaml
+│   ├── application.yaml
+│   └── grafana-application.yaml
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
@@ -401,7 +422,7 @@ kubectl logs deployment/backend
 
 ### OpenTelemetry Tracing
 
-Tracing zinciri:
+Distributed tracing zinciri:
 
 ```text
 Frontend Flask span
@@ -411,15 +432,39 @@ Frontend HTTP client span
 Backend Flask span
   ↓
 PostgreSQL client spans
+  ↓
+OTel Collector
+  ↓
+Tempo
+  ↓
+Grafana Explore
 ```
 
-Trace'ler OTLP/HTTP ile OTel Collector'a gönderilir:
+Uygulamalar trace'leri OTLP/HTTP ile Collector'a gönderir:
 
 ```text
 http://otel-collector:4318/v1/traces
 ```
 
-Collector bu task kapsamında `debug` exporter kullanır.
+Collector trace'leri Tempo'nun OTLP gRPC endpoint'ine iletir:
+
+```text
+tempo:4317
+```
+
+Tempo, Grafana'da provision edilmiş datasource olarak kullanılır.
+
+Sampling örnekleri:
+
+```text
+GET /sampling/head
+GET /sampling/tail?outcome=ok
+GET /sampling/tail?outcome=error
+```
+
+`/sampling/head` için karar backend OpenTelemetry SDK'sında trace başlarken verilir. Sample edilmeyen trace Collector'a ulaşmaz.
+
+`/sampling/tail` trace'leri Collector'a ulaşır. Tail sampling processor trace'i bekleyip attribute'lara göre karar verir; demo politikasında `ok` trace drop edilir, `error` trace tutulur.
 
 ### Prometheus
 
@@ -454,13 +499,20 @@ cnpg_collector_up
 
 ### Grafana
 
-Grafana Prometheus'a cluster içindeki Service DNS üzerinden bağlanır:
+Grafana, `argocd/grafana-application.yaml` üzerinden Grafana Community Helm chart ile deploy edilir.
+
+Provision edilen datasource'lar:
 
 ```text
-http://prometheus:9090
+Prometheus → http://prometheus:9090
+Tempo      → http://tempo:3200
 ```
 
-Datasource `k8s/grafana.yaml` içindeki ConfigMap ile provision edilir.
+Datasource configuration:
+
+```text
+k8s/grafana-helm-datasource.yaml
+```
 
 Dashboard'lar:
 
@@ -475,10 +527,33 @@ grafana/dashboards/cloudnativepg.json
 - Requests by Status
 - Average Request Duration
 - Application Targets
+- 5xx Error Rate
+- Requests Last 5 Minutes
 
-Dashboard JSON'ları `k8s/grafana-dashboards.yaml` içindeki ConfigMap ile provision edilir. Yeni Grafana Pod'u datasource ve dashboard'ları manuel import gerektirmeden yükler.
+Dashboard JSON'ları `k8s/grafana-dashboards.yaml` ConfigMap'i ile provision edilir.
 
-CloudNativePG dashboard ConfigMap'i büyük olduğu için Argo CD Server-Side Apply sync option kullanılır:
+Alerting de configuration-as-code olarak tutulur:
+
+```text
+k8s/grafana-helm-alerts.yaml
+k8s/grafana-helm-notifications.yaml
+```
+
+Alert rule, email contact point ve notification policy provisioning ile yüklenir.
+
+SMTP hedefi:
+
+```text
+mailpit:1025
+```
+
+Mailpit Web UI:
+
+```text
+http://localhost:8025
+```
+
+CloudNativePG dashboard ConfigMap'i büyük olduğu için Argo CD Server-Side Apply kullanılır:
 
 ```text
 argocd.argoproj.io/sync-options: ServerSideApply=true
@@ -585,10 +660,12 @@ kubectl get statefulset | grep redis
 kubectl get svc | grep redis
 ```
 
-Grafana ve Prometheus:
+Observability:
 
 ```bash
-kubectl get deployment grafana prometheus
+kubectl get deployment prometheus otel-collector tempo mailpit
+kubectl get deployment grafana-helm
+kubectl -n argocd get application cicd-task grafana-helm
 ```
 
 ## Kaynaklar
