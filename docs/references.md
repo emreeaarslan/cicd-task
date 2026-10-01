@@ -102,12 +102,6 @@ https://docs.docker.com/build/ci/github-actions/multi-platform/
 
 GitHub Actions pipeline'ına QEMU, Docker Buildx ve `linux/amd64,linux/arm64` desteği eklemek için kullanıldı.
 
-### Server-Side Apply Sync Option
-
-https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
-
-Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
-
 ## GitHub Actions
 
 ### Workflow Syntax
@@ -134,12 +128,6 @@ https://docs.github.com/actions/concepts/security/github_token
 
 Release workflow'unda GHCR publish, GitHub Release ve repository üzerinde manifest commit işlemlerinde kullanılan token davranışını anlamak için kullanıldı.
 
-### Server-Side Apply Sync Option
-
-https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
-
-Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
-
 ## GitHub Container Registry
 
 ### Working with the Container Registry
@@ -147,12 +135,6 @@ Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sı
 https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry
 
 Backend ve frontend Docker image'larının GHCR üzerinde tutulması ve GitHub Actions tarafından publish edilmesi için kullanıldı.
-
-### Server-Side Apply Sync Option
-
-https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
-
-Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
 
 ## GitHub Releases
 
@@ -358,6 +340,25 @@ https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboar
 
 Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
 
+
+### Deploy Grafana using Helm Charts
+
+https://grafana.com/docs/grafana/latest/setup-grafana/installation/helm/
+
+Grafana'nın Kubernetes üzerinde `grafana-community/grafana` Helm chart ile kurulması için referans alındı.
+
+### Provision Alerting Resources from Files
+
+https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+
+Alert rule, contact point ve notification policy kaynaklarının configuration-as-code olarak provisioning dosyalarıyla yönetilmesi için kullanıldı.
+
+### Provision Tempo Data Source
+
+https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/provision/
+
+Tempo datasource'unun YAML provisioning ile version-controlled şekilde Grafana'ya eklenmesi için kullanıldı.
+
 ## Helm
 
 ### Helm Documentation
@@ -434,47 +435,12 @@ https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboar
 
 Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
 
-## Helm
 
-### Helm Documentation
+### Sampling
 
-https://helm.sh/docs/
+https://opentelemetry.io/docs/concepts/sampling/
 
-OpsTree Redis Operator chart repository'sini eklemek ve operator'ü version-pinned Helm release olarak kurmak için kullanıldı.
-
-## Redis
-
-### High Availability with Redis Sentinel
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/
-
-Redis Sentinel monitoring, quorum, automatic failover ve replica promotion davranışını anlamak ve Sentinel seçimini gerekçelendirmek için kullanıldı.
-
-### Scale with Redis Cluster
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/
-
-Redis Cluster'ın veriyi shard ederek horizontal scaling sağlaması ile Sentinel tabanlı HA yaklaşımı arasındaki farkı değerlendirmek için kullanıldı.
-
-### Redis Replication
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
-
-Primary-replica veri replikasyonu ve failover sonrası replica ilişkilerini anlamak için kullanıldı.
-
-## OpsTree Redis Operator
-
-### Redis Operator Installation
-
-https://github.com/OT-CONTAINER-KIT/redis-operator/blob/main/docs/content/en/docs/Installation/Installation/_index.md
-
-Redis Operator'ın Helm ile kurulması ve `RedisReplication` / `RedisSentinel` CRD'lerinin kullanılması için referans alındı.
-
-### Redis Operator Repository
-
-https://github.com/OT-CONTAINER-KIT/redis-operator
-
-Operator'ın Redis replication, Sentinel ve Kubernetes resource yönetimi davranışlarını incelemek için kullanıldı.
+Head sampling ile tail sampling arasındaki farkı; kararın trace başında veya trace verisi toplandıktan sonra verilmesi yaklaşımını anlamak için kullanıldı.
 
 ## OpenTelemetry Collector
 
@@ -493,6 +459,12 @@ OTLP receiver, batch processor ve debug exporter pipeline'ını yapılandırmak 
 https://opentelemetry.io/docs/specs/otlp/
 
 Uygulama trace'lerinin OTLP/HTTP ile Collector'a gönderilmesi için kullanılan protokolü anlamak için referans alındı.
+
+### OTLP gRPC Exporter
+
+https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/README.md
+
+Collector'dan Tempo'ya OTLP gRPC ile trace gönderimi ve güncel `otlp_grpc` exporter configuration adı için kullanıldı.
 
 ### Grafana
 
@@ -514,47 +486,12 @@ https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboar
 
 Uygulama metrikleri için `Application Overview` dashboard'unun panel ve query yapısını oluşturmak için kullanıldı.
 
-## Helm
 
-### Helm Documentation
+### Tail Sampling Processor
 
-https://helm.sh/docs/
+https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md
 
-OpsTree Redis Operator chart repository'sini eklemek ve operator'ü version-pinned Helm release olarak kurmak için kullanıldı.
-
-## Redis
-
-### High Availability with Redis Sentinel
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/
-
-Redis Sentinel monitoring, quorum, automatic failover ve replica promotion davranışını anlamak ve Sentinel seçimini gerekçelendirmek için kullanıldı.
-
-### Scale with Redis Cluster
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/
-
-Redis Cluster'ın veriyi shard ederek horizontal scaling sağlaması ile Sentinel tabanlı HA yaklaşımı arasındaki farkı değerlendirmek için kullanıldı.
-
-### Redis Replication
-
-https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
-
-Primary-replica veri replikasyonu ve failover sonrası replica ilişkilerini anlamak için kullanıldı.
-
-## OpsTree Redis Operator
-
-### Redis Operator Installation
-
-https://github.com/OT-CONTAINER-KIT/redis-operator/blob/main/docs/content/en/docs/Installation/Installation/_index.md
-
-Redis Operator'ın Helm ile kurulması ve `RedisReplication` / `RedisSentinel` CRD'lerinin kullanılması için referans alındı.
-
-### Redis Operator Repository
-
-https://github.com/OT-CONTAINER-KIT/redis-operator
-
-Operator'ın Redis replication, Sentinel ve Kubernetes resource yönetimi davranışlarını incelemek için kullanıldı.
+Collector'ın trace'leri `trace_id` bazında bekleyip policy'lere göre sample/drop kararı vermesi ve tail sampling yapılandırması için kullanıldı.
 
 ## OpenTelemetry Python
 
@@ -585,6 +522,29 @@ Frontend'in backend'e yaptığı `requests` HTTP çağrısının distributed tra
 https://opentelemetry-python-contrib.readthedocs.io/en/latest/instrumentation/psycopg/psycopg.html
 
 Backend'in PostgreSQL sorgularının trace span'ları olarak üretilmesi için kullanıldı.
+
+
+## Grafana Tempo
+
+### Tempo Configuration
+
+https://grafana.com/docs/tempo/latest/configuration/
+
+Tempo'nun monolithic deployment yapısı, OTLP receiver ve trace storage configuration seçenekleri için kullanıldı.
+
+### OpenTelemetry Collector to Tempo
+
+https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/otel-collector/
+
+OpenTelemetry Collector'dan Tempo'ya OTLP üzerinden trace gönderimi ve OTLP gRPC `4317` endpoint'i için referans alındı.
+
+## Mailpit
+
+### Docker Images
+
+https://mailpit.axllent.org/docs/install/docker/
+
+Mailpit'in container olarak çalıştırılması, SMTP `1025` ve Web UI `8025` portlarının kullanılması için referans alındı.
 
 ## Argo CD
 
@@ -620,15 +580,10 @@ https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-ap
 
 Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
 
+
 ## Git
 
-#### Server-Side Apply Sync Option
-
-https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#server-side-apply
-
-Büyük Grafana dashboard ConfigMap'inin client-side apply annotation boyutu sınırına takılmaması için `ServerSideApply=true` sync option kullanımına referans oldu.
-
-## Git Documentation
+#### Git Documentation
 
 https://git-scm.com/docs
 
