@@ -2,6 +2,8 @@ import time
 
 import psycopg
 from flask import Flask, Response, g, jsonify, request
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode, TraceFlags
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from db import check_database, get_latest_message, init_db, save_message
@@ -102,6 +104,70 @@ def metrics():
         generate_latest(),
         content_type=CONTENT_TYPE_LATEST,
     )
+
+
+@app.get("/sampling/head")
+def head_sampling_demo():
+    """Demonstrate a head-sampling decision made when the trace starts."""
+    span = trace.get_current_span()
+    context = span.get_span_context()
+
+    if span.is_recording():
+        span.set_attribute("sampling.strategy", "head")
+
+    return jsonify(
+        {
+            "service": "backend",
+            "strategy": "head",
+            "sampling_rate": 0.5,
+            "sampled": bool(context.trace_flags & TraceFlags.SAMPLED),
+            "trace_id": format(context.trace_id, "032x"),
+        }
+    ), 200
+
+
+@app.get("/sampling/tail")
+def tail_sampling_demo():
+    """Generate a trace whose final outcome is evaluated by the Collector."""
+    outcome = request.args.get("outcome", "ok").lower()
+
+    if outcome not in {"ok", "error"}:
+        return jsonify(
+            {
+                "service": "backend",
+                "error": "outcome must be 'ok' or 'error'",
+            }
+        ), 400
+
+    span = trace.get_current_span()
+    context = span.get_span_context()
+
+    if span.is_recording():
+        span.set_attribute("sampling.strategy", "tail")
+        span.set_attribute("sampling.outcome", outcome)
+
+    response = {
+        "service": "backend",
+        "strategy": "tail",
+        "outcome": outcome,
+        "sampled_at_head": bool(
+            context.trace_flags & TraceFlags.SAMPLED
+        ),
+        "trace_id": format(context.trace_id, "032x"),
+    }
+
+    if outcome == "error":
+        if span.is_recording():
+            span.set_status(
+                Status(
+                    StatusCode.ERROR,
+                    "intentional tail sampling demo error",
+                )
+            )
+
+        return jsonify(response), 503
+
+    return jsonify(response), 200
 
 
 @app.get("/api/message")
