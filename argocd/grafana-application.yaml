@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-helm
+  namespace: argocd
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: grafana
+    targetRevision: 13.2.7
+
+    helm:
+      releaseName: grafana-helm
+
+      valuesObject:
+        grafana.ini:
+          smtp:
+            enabled: true
+            host: mailpit:1025
+            from_address: grafana@cicd.local
+            from_name: Grafana
+            startTLS_policy: NoStartTLS
+
+        sidecar:
+          dashboards:
+            enabled: true
+            label: grafana_dashboard
+
+          datasources:
+            enabled: true
+            label: grafana_datasource
+
+          alerts:
+            enabled: true
+            label: grafana_alert
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
